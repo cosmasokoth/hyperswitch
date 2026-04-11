@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hyperswitch Test Checkout</title>
+  <script src="https://<your-web-sdk-url>/HyperLoader.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 520px; margin: 40px auto; padding: 20px; }
+    #checkout { margin: 20px 0; min-height: 320px; padding: 16px; border: 1px solid #eee; border-radius: 8px; }
+    button { background: #006df9; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; }
+    .status { padding: 12px; margin: 12px 0; border-radius: 6px; }
+    .error { background: #fee; color: #c00; }
+    .success { background: #efe; color: #060; }
+  </style>
+</head>
+<body>
+  <h1>Hyperswitch Test Checkout</h1>
+  <button onclick="createPayment()">Create Payment</button>
+  <div id="checkout-container" style="display:none">
+    <div id="checkout"></div>
+    <button id="pay" onclick="pay()">Pay</button>
+  </div>
+  <div id="status"></div>
+
+  <script>
+    const ROUTER_URL  = "https://<your-router-url>";
+    const SDK_URL     = "https://<your-web-sdk-url>";
+    const API_KEY     = "snd_xxxxxxxxxxxxxxxx";
+    const PUB_KEY     = "pk_snd_xxxxxxxxxxxxxxxx";
+    const PROFILE_ID  = "pro_xxxxxxxxxxxxxxxx";
+
+    let hyper, elements;
+    const setStatus = (msg, type) => document.getElementById("status").innerHTML = `<div class="status ${type}">${msg}</div>`;
+
+    async function createPayment() {
+      setStatus("Creating payment intent...", "info");
+      const res = await fetch(ROUTER_URL + "/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "api-key": API_KEY },
+        body: JSON.stringify({
+          amount: 1000,
+          currency: "USD",
+          customer_id: "test_cust_" + Date.now(),
+          authentication_type: "no_three_ds",
+          profile_id: PROFILE_ID,
+          allowed_payment_method_types: ["credit", "debit"],
+          billing: { address: { country: "US", city: "NY", line1: "1 Test St", zip: "10001" } }
+        })
+      });
+      const data = await res.json();
+      if (data.error) { setStatus("Error: " + JSON.stringify(data.error), "error"); return; }
+
+      setStatus("Payment created: " + data.payment_id, "success");
+      document.getElementById("checkout-container").style.display = "block";
+
+      hyper = Hyper(PUB_KEY, { customBackendUrl: ROUTER_URL });
+      elements = hyper.elements({
+        clientSecret: data.client_secret,
+        appearance: { theme: "default" },
+        walletReturnUrl: window.location.href
+      });
+
+      const paymentElement = elements.create("payment", {
+        layout: "tabs",
+        walletReturnUrl: window.location.href,
+        wallets: { applePay: "never", googlePay: "never" }
+      });
+      paymentElement.mount("#checkout");
+    }
+
+    async function pay() {
+      setStatus("Confirming payment...", "info");
+      const result = await hyper.confirmPayment({
+        elements,
+        confirmParams: { return_url: window.location.href },
+        redirect: "if_required"
+      });
+      if (result.error) setStatus("Payment failed: " + result.error.message, "error");
+      else setStatus("🎉 Payment succeeded!", "success");
+    }
+  </script>
+</body>
+</html>
