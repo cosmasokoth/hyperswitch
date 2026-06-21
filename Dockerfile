@@ -1,4 +1,4 @@
-FROM docker.juspay.io/juspaydotin/hyperswitch-router:v1.121.0-standalone
+FROM docker.io/juspaydotin/hyperswitch-router:v1.121.0-standalone
 
 USER root
 
